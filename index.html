@@ -350,8 +350,15 @@
 
         if (!res.ok) throw new Error(`Server responded with ${res.status}`);
 
-        const text = await res.text();
-        renderResult(text);
+        const contentType = res.headers.get('content-type') || '';
+        let data;
+        if (contentType.includes('application/json')) {
+          data = await res.json();
+        } else {
+          const text = await res.text();
+          try { data = JSON.parse(text); } catch { data = text; }
+        }
+        renderResult(data);
 
       } catch (err) {
         errorBox.textContent = `Something went wrong: ${err.message}`;
@@ -420,32 +427,83 @@
       { bg: '#dcfce7', border: '#86efac', text: '#166534', dot: '#22c55e' },
     ];
 
-    function renderResult(raw) {
-      if (!raw || !raw.trim()) {
+    function renderResult(data) {
+      if (!data) {
         errorBox.textContent = 'Received an empty response.';
         errorBox.style.display = 'block';
         return;
       }
 
-      const { title, segments } = parseTranscript(raw);
-      const speakerMap = {};
-      let colorIdx = 0;
-
-      let html = `<h2>Transcript <span class="badge">✓ Done</span></h2>`;
-
-      if (title) {
-        html += `<div class="transcript-title">${escapeHtml(title)}</div>`;
+      // JSON paragraphs format
+      if (typeof data === 'object' && data.paragraphs) {
+        renderParagraphs(data.paragraphs);
+        return;
       }
 
+      // Plain text fallback
+      if (typeof data === 'string') {
+        const { title, segments } = parseTranscript(data);
+        renderSegments(title, segments, data);
+        return;
+      }
+
+      errorBox.textContent = 'Received an unexpected response format.';
+      errorBox.style.display = 'block';
+    }
+
+    function formatTime(seconds) {
+      const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+      const s = Math.floor(seconds % 60).toString().padStart(2, '0');
+      return `${m}:${s}`;
+    }
+
+    function renderParagraphs(paragraphs) {
+      if (!paragraphs.length) {
+        errorBox.textContent = 'No transcript segments found.';
+        errorBox.style.display = 'block';
+        return;
+      }
+
+      let html = `<h2>Transcript <span class="badge">✓ Done</span></h2><div class="segments">`;
+
+      for (const p of paragraphs) {
+        const speakerKey = `Speaker ${p.speaker + 1}`;
+        const c = speakerColors[p.speaker % speakerColors.length];
+        const time = `${formatTime(p.start)} – ${formatTime(p.end)}`;
+        html += `
+          <div class="segment" style="border-left-color:${c.border}; background:${c.bg};">
+            <div class="seg-meta">
+              <span class="seg-speaker" style="color:${c.text};">
+                <span class="seg-dot" style="background:${c.dot};"></span>
+                ${escapeHtml(speakerKey)}
+              </span>
+              <span class="seg-time">${time}</span>
+            </div>
+            <p class="seg-text">${escapeHtml(p.text)}</p>
+          </div>
+        `;
+      }
+
+      html += `</div>`;
+      resultCard.innerHTML = html;
+      resultCard.style.display = 'block';
+      resultCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function renderSegments(title, segments, raw) {
+      let html = `<h2>Transcript <span class="badge">✓ Done</span></h2>`;
+
+      if (title) html += `<div class="transcript-title">${escapeHtml(title)}</div>`;
+
       if (!segments.length) {
-        // Fallback: just show raw text
         html += `<div class="raw-text">${escapeHtml(raw)}</div>`;
       } else {
+        const speakerMap = {};
+        let colorIdx = 0;
         html += `<div class="segments">`;
         for (const seg of segments) {
           if (!(seg.speaker in speakerMap)) {
-            speakerMap[seg.speaker] = speakerColors[colorIdx % speakerColors.length];
-            colorIdx++;
+            speakerMap[seg.speaker] = speakerColors[colorIdx++ % speakerColors.length];
           }
           const c = speakerMap[seg.speaker];
           html += `
