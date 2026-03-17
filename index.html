@@ -1,22 +1,474 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Instagram Transcriber</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+      padding: 40px 16px;
+      background: linear-gradient(135deg, #f5f0ff 0%, #fce4ec 100%);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 20px;
+      padding: 48px 40px;
+      width: 100%;
+      max-width: 500px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.08);
+    }
+
+    .icon {
+      width: 52px;
+      height: 52px;
+      background: linear-gradient(135deg, #833ab4, #fd1d1d, #fcb045);
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 24px;
+    }
+
+    .icon svg {
+      width: 26px;
+      height: 26px;
+      fill: none;
+      stroke: #fff;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #1a1a2e;
+      margin-bottom: 6px;
+    }
+
+    p.subtitle {
+      font-size: 0.9rem;
+      color: #888;
+      margin-bottom: 32px;
+    }
+
+    label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #555;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 8px;
+    }
+
+    .input-wrapper {
+      position: relative;
+    }
+
+    .input-wrapper svg {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 18px;
+      height: 18px;
+      stroke: #aaa;
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      pointer-events: none;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      padding: 14px 14px 14px 42px;
+      border: 1.5px solid #e8e8e8;
+      border-radius: 12px;
+      font-size: 0.95rem;
+      color: #1a1a2e;
+      background: #fafafa;
+      transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+      outline: none;
+    }
+
+    input[type="text"]:focus {
+      border-color: #833ab4;
+      background: #fff;
+      box-shadow: 0 0 0 4px rgba(131, 58, 180, 0.08);
+    }
+
+    input[type="text"]::placeholder { color: #bbb; }
+
+    button[type="submit"] {
+      margin-top: 20px;
+      width: 100%;
+      padding: 15px;
+      border: none;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #833ab4, #fd1d1d);
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.15s;
+      letter-spacing: 0.02em;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    button[type="submit"]:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
+    button[type="submit"]:active:not(:disabled) { transform: translateY(0); opacity: 1; }
+    button[type="submit"]:disabled { opacity: 0.65; cursor: not-allowed; }
+
+    .hint {
+      margin-top: 16px;
+      font-size: 0.78rem;
+      color: #bbb;
+      text-align: center;
+    }
+
+    /* Spinner */
+    .spinner {
+      width: 18px;
+      height: 18px;
+      border: 2.5px solid rgba(255,255,255,0.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Result card */
+    .result-card {
+      background: #fff;
+      border-radius: 20px;
+      padding: 36px 40px;
+      width: 100%;
+      max-width: 640px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.08);
+      animation: fadeUp 0.4s ease;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .result-card h2 {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #1a1a2e;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .result-card h2 span.badge {
+      font-size: 0.7rem;
+      font-weight: 600;
+      background: linear-gradient(135deg, #833ab4, #fd1d1d);
+      color: #fff;
+      padding: 3px 10px;
+      border-radius: 20px;
+      letter-spacing: 0.04em;
+    }
+
+    /* Transcript styles */
+    .transcript-title {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #999;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1.5px solid #f0f0f0;
+    }
+
+    .segments {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .segment {
+      border-left: 3px solid;
+      border-radius: 0 12px 12px 0;
+      padding: 14px 16px;
+    }
+
+    .seg-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .seg-speaker {
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .seg-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      display: inline-block;
+      flex-shrink: 0;
+    }
+
+    .seg-time {
+      font-size: 0.72rem;
+      color: #aaa;
+      font-variant-numeric: tabular-nums;
+      background: rgba(0,0,0,0.04);
+      padding: 2px 8px;
+      border-radius: 20px;
+    }
+
+    .seg-text {
+      font-size: 0.92rem;
+      color: #333;
+      line-height: 1.7;
+      margin: 0;
+    }
+
+    .raw-text {
+      font-size: 0.92rem;
+      color: #333;
+      line-height: 1.7;
+      white-space: pre-wrap;
+      background: #fafafa;
+      border: 1.5px solid #f0f0f0;
+      border-radius: 10px;
+      padding: 14px;
+    }
+
+    /* Error state */
+    .error-box {
+      background: #fff5f5;
+      border: 1.5px solid #ffd0d0;
+      border-radius: 12px;
+      padding: 14px 16px;
+      color: #c0392b;
+      font-size: 0.88rem;
+      margin-top: 16px;
+      display: none;
+    }
+  </style>
 </head>
 <body>
-  <h2>Instagram Video Transcriber</h2>
 
-  <form action="YOUR_N8N_WEBHOOK_URL" method="POST">
-    <input 
-      type="text" 
-      name="url" 
-      placeholder="Paste Instagram link" 
-      required 
-      style="width:300px;padding:8px;"
-    />
-    <br><br>
-    <button type="submit">Transcribeddd</button>
-  </form>
+  <div class="card">
+    <div class="icon">
+      <svg viewBox="0 0 24 24">
+        <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
+        <circle cx="12" cy="12" r="4"/>
+        <circle cx="17.5" cy="6.5" r="0.5" fill="#fff" stroke="none"/>
+      </svg>
+    </div>
+
+    <h1>Instagram Transcriber</h1>
+    <p class="subtitle">Paste a video link and get the transcript instantly.</p>
+
+    <form id="transcribeForm">
+      <label for="url">Instagram URL</label>
+      <div class="input-wrapper">
+        <svg viewBox="0 0 24 24">
+          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+        </svg>
+        <input
+          type="text"
+          id="url"
+          name="url"
+          placeholder="https://www.instagram.com/reel/..."
+          required
+          autocomplete="off"
+        />
+      </div>
+
+      <div class="error-box" id="errorBox"></div>
+
+      <button type="submit" id="submitBtn">Transcribe Video</button>
+    </form>
+
+    <p class="hint">Supports Reels, Posts, and IGTV links</p>
+  </div>
+
+  <div class="result-card" id="resultCard" style="display:none;"></div>
+
+  <script>
+    const WEBHOOK = 'https://n8n.vircaio.com/webhook/4b427b85-6106-4a30-a414-a3c8c21ebec5';
+
+    const form      = document.getElementById('transcribeForm');
+    const submitBtn = document.getElementById('submitBtn');
+    const errorBox  = document.getElementById('errorBox');
+    const resultCard = document.getElementById('resultCard');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const url = document.getElementById('url').value.trim();
+
+      // Reset state
+      errorBox.style.display = 'none';
+      resultCard.style.display = 'none';
+      resultCard.innerHTML = '';
+
+      // Loading state
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<div class="spinner"></div> Transcribing...';
+
+      try {
+        const res = await fetch(WEBHOOK, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url })
+        });
+
+        if (!res.ok) throw new Error(`Server responded with ${res.status}`);
+
+        const text = await res.text();
+        renderResult(text);
+
+      } catch (err) {
+        errorBox.textContent = `Something went wrong: ${err.message}`;
+        errorBox.style.display = 'block';
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = 'Transcribe Video';
+      }
+    });
+
+    function escapeHtml(str) {
+      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function parseTranscript(raw) {
+      const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+
+      let title = '';
+      const segments = [];
+      let current = null;
+
+      for (const line of lines) {
+        // Separator line
+        if (/^=+$/.test(line)) continue;
+
+        // Title line (before any speaker block)
+        if (!segments.length && !/^Speaker\s+\d+/i.test(line) && !/^\d{2}:\d{2}/.test(line)) {
+          title = title ? title + ' ' + line : line;
+          continue;
+        }
+
+        // Speaker header: "Speaker 1" or "Speaker 1 00:00 - 00:08"
+        const speakerMatch = line.match(/^(Speaker\s+\d+)\s*(\d{2}:\d{2}\s*-\s*\d{2}:\d{2})?$/i);
+        if (speakerMatch) {
+          if (current) segments.push(current);
+          current = {
+            speaker: speakerMatch[1],
+            time: speakerMatch[2] || '',
+            lines: []
+          };
+          continue;
+        }
+
+        // Timestamp-only line: "00:00 - 00:08"
+        const timeOnly = line.match(/^(\d{2}:\d{2}\s*-\s*\d{2}:\d{2})$/);
+        if (timeOnly && current && !current.time) {
+          current.time = timeOnly[1];
+          continue;
+        }
+
+        // Dialogue line
+        if (current) {
+          current.lines.push(line);
+        }
+      }
+
+      if (current) segments.push(current);
+      return { title, segments };
+    }
+
+    // Assign a consistent color per speaker index
+    const speakerColors = [
+      { bg: '#f0e8ff', border: '#c084fc', text: '#6b21a8', dot: '#a855f7' },
+      { bg: '#e0f2fe', border: '#7dd3fc', text: '#075985', dot: '#0ea5e9' },
+      { bg: '#fef9c3', border: '#fde047', text: '#854d0e', dot: '#eab308' },
+      { bg: '#dcfce7', border: '#86efac', text: '#166534', dot: '#22c55e' },
+    ];
+
+    function renderResult(raw) {
+      if (!raw || !raw.trim()) {
+        errorBox.textContent = 'Received an empty response.';
+        errorBox.style.display = 'block';
+        return;
+      }
+
+      const { title, segments } = parseTranscript(raw);
+      const speakerMap = {};
+      let colorIdx = 0;
+
+      let html = `<h2>Transcript <span class="badge">✓ Done</span></h2>`;
+
+      if (title) {
+        html += `<div class="transcript-title">${escapeHtml(title)}</div>`;
+      }
+
+      if (!segments.length) {
+        // Fallback: just show raw text
+        html += `<div class="raw-text">${escapeHtml(raw)}</div>`;
+      } else {
+        html += `<div class="segments">`;
+        for (const seg of segments) {
+          if (!(seg.speaker in speakerMap)) {
+            speakerMap[seg.speaker] = speakerColors[colorIdx % speakerColors.length];
+            colorIdx++;
+          }
+          const c = speakerMap[seg.speaker];
+          html += `
+            <div class="segment" style="border-left-color:${c.border}; background:${c.bg};">
+              <div class="seg-meta">
+                <span class="seg-speaker" style="color:${c.text};">
+                  <span class="seg-dot" style="background:${c.dot};"></span>
+                  ${escapeHtml(seg.speaker)}
+                </span>
+                ${seg.time ? `<span class="seg-time">${escapeHtml(seg.time)}</span>` : ''}
+              </div>
+              <p class="seg-text">${escapeHtml(seg.lines.join(' '))}</p>
+            </div>
+          `;
+        }
+        html += `</div>`;
+      }
+
+      resultCard.innerHTML = html;
+      resultCard.style.display = 'block';
+      resultCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  </script>
 
 </body>
 </html>
